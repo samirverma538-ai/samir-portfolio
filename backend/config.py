@@ -6,9 +6,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 from dotenv import load_dotenv
 
 load_dotenv(BASE_DIR / ".env")
-UPLOAD_DIR = BASE_DIR / "uploads"
+RENDER = os.getenv("RENDER", "false").lower() == "true"
+if RENDER:
+    PERSISTENT_DIR = Path("/var/data")
+    PERSISTENT_DIR.mkdir(parents=True, exist_ok=True)
+    UPLOAD_DIR = PERSISTENT_DIR / "uploads"
+    DATABASE_URL = f"sqlite:///{PERSISTENT_DIR / 'app.db'}"
+else:
+    UPLOAD_DIR = BASE_DIR / "uploads"
+    DATABASE_URL = f"sqlite:///{BASE_DIR / 'app.db'}"
+
 PROFILE_DIR = BASE_DIR / "static" / "profile"
-DATABASE_URL = f"sqlite:///{BASE_DIR / 'app.db'}"
 
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "sameerverma14337")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")

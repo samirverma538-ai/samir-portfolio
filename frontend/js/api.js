@@ -1,6 +1,6 @@
 export const API_BASE = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
   ? "http://localhost:8000"
-  : "https://YOUR_BACKEND_RENDER_URL.onrender.com"; // TODO: Replace with your actual deployed Render backend URL
+  : window.location.origin;
 
 function normalizeDocumentGroups(data) {
   if (!Array.isArray(data) || !data.length) return [];
