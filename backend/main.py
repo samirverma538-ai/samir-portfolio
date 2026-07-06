@@ -7,9 +7,8 @@ from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from config import BASE_DIR, PROFILE_DIR, UPLOAD_DIR, SUPABASE_URL, SUPABASE_KEY, SUPABASE_BUCKET
-from database import Base, SessionLocal, engine
-from models import Document, SiteConfig
 from routers import chat, config, documents
+from store import load_config, save_config
 
 app = FastAPI(title="Architecture Document Showcase", version="1.0.0")
 
@@ -32,7 +31,9 @@ async def get_upload(filename: str):
     if local_path.exists():
         return FileResponse(local_path)
     if SUPABASE_URL and SUPABASE_KEY:
-        return RedirectResponse(f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/public/{SUPABASE_BUCKET}/{filename}")
+        return RedirectResponse(
+            f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/public/{SUPABASE_BUCKET}/{filename}"
+        )
     raise HTTPException(status_code=404, detail="File not found")
 
 
@@ -41,71 +42,16 @@ app.mount("/js", StaticFiles(directory=str(BASE_DIR / "frontend" / "js")), name=
 app.mount("/css", StaticFiles(directory=str(BASE_DIR / "frontend" / "css")), name="css")
 
 
-def _migrate_documents():
-    import uuid
-
-    from sqlalchemy import inspect, text
-
-    inspector = inspect(engine)
-    if "documents" not in inspector.get_table_names():
-        return
-
-    columns = {col["name"] for col in inspector.get_columns("documents")}
-    with engine.begin() as conn:
-        if "group_id" not in columns:
-            conn.execute(text("ALTER TABLE documents ADD COLUMN group_id VARCHAR(36)"))
-        if "group_order" not in columns:
-            conn.execute(text("ALTER TABLE documents ADD COLUMN group_order INTEGER DEFAULT 0"))
-        if "thumbnail_path" not in columns:
-            conn.execute(text("ALTER TABLE documents ADD COLUMN thumbnail_path VARCHAR(500)"))
-
-    db = SessionLocal()
-    try:
-        from services.thumbnail_generator import create_thumbnail
-
-        missing = db.query(Document).filter(Document.group_id.is_(None)).all()
-        for doc in missing:
-            doc.group_id = uuid.uuid4().hex
-            doc.group_order = 0
-        if missing:
-            db.commit()
-
-        primary_docs = db.query(Document).filter(Document.group_order == 0).all()
-        updated = False
-        for doc in primary_docs:
-            if doc.thumbnail_path:
-                continue
-            source = UPLOAD_DIR / doc.filename
-            if not source.exists():
-                continue
-            doc.thumbnail_path = create_thumbnail(source, doc.file_type, doc.extracted_text or "")
-            updated = True
-        if updated:
-            db.commit()
-    finally:
-        db.close()
-
-
-def _seed_defaults():
-    db = SessionLocal()
-    try:
-        if not db.query(SiteConfig).first():
-            db.add(SiteConfig(id=1))
-            db.commit()
-
-        default_profile = PROFILE_DIR / "default.jpg"
-        beach = BASE_DIR / "beach.jpeg"
-        if not default_profile.exists() and beach.exists():
-            shutil.copy(beach, default_profile)
-    finally:
-        db.close()
-
-
 @app.on_event("startup")
 def startup():
-    Base.metadata.create_all(bind=engine)
-    _migrate_documents()
-    _seed_defaults()
+    # Seed default profile picture if missing
+    default_profile = PROFILE_DIR / "default.jpg"
+    beach = BASE_DIR / "beach.jpeg"
+    if not default_profile.exists() and beach.exists():
+        shutil.copy(beach, default_profile)
+
+    # Ensure config.json exists with defaults
+    load_config()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -116,4 +62,3 @@ async def root():
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_page():
     return Path(BASE_DIR / "frontend" / "admin.html").read_text()
-

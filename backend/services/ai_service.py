@@ -1,6 +1,5 @@
 import re
 import google.generativeai as genai
-from google.cloud import firestore
 
 from config import (
     GEMINI_API_KEY,
@@ -10,7 +9,8 @@ from config import (
     RAG_MAX_CONTEXT_CHARS,
     RAG_MIN_QUERY_TERM_LEN,
 )
-from models import Document, SiteConfig
+from models import DocumentRecord, SiteConfigRecord
+from store import load_documents, load_config
 
 MAX_HISTORY_TURNS = 6
 
@@ -44,7 +44,7 @@ def _split_into_chunks(text: str, chunk_size: int, overlap: int) -> list[str]:
     return chunks
 
 
-def _format_doc_section(doc: Document, content: str, label: str = "Full content") -> str:
+def _format_doc_section(doc: DocumentRecord, content: str, label: str = "Full content") -> str:
     return (
         f"--- Document: {doc.original_filename} ---\n"
         f"Description: {doc.description or 'No description'}\n"
@@ -57,14 +57,10 @@ def _score_chunk(chunk: str, query_terms: set[str]) -> float:
     if not query_terms:
         return 0.0
     chunk_lower = chunk.lower()
-    score = 0.0
-    for term in query_terms:
-        if term in chunk_lower:
-            score += chunk_lower.count(term)
-    return score
+    return sum(chunk_lower.count(term) for term in query_terms)
 
 
-def _build_profile_context(config: SiteConfig) -> str:
+def _build_profile_context(config: SiteConfigRecord) -> str:
     return (
         f"Site Owner Profile:\n"
         f"- Name: {config.owner_name}\n"
@@ -76,7 +72,7 @@ def _build_profile_context(config: SiteConfig) -> str:
     )
 
 
-def _build_full_documents_context(docs: list[Document]) -> tuple[str, int]:
+def _build_full_documents_context(docs: list[DocumentRecord]) -> tuple[str, int]:
     sections: list[str] = []
     total_chars = 0
     for doc in docs:
@@ -90,10 +86,8 @@ def _build_full_documents_context(docs: list[Document]) -> tuple[str, int]:
     return body, total_chars
 
 
-def _build_retrieved_context(
-    docs: list[Document], query_terms: set[str], budget: int
-) -> str:
-    scored_chunks: list[tuple[float, Document, int, str]] = []
+def _build_retrieved_context(docs: list[DocumentRecord], query_terms: set[str], budget: int) -> str:
+    scored_chunks: list[tuple[float, DocumentRecord, int, str]] = []
 
     for doc in docs:
         text = (doc.extracted_text or "").strip()
@@ -111,16 +105,12 @@ def _build_retrieved_context(
 
     selected: list[str] = []
     used_chars = 0
-    docs_included: set[str] = set()
+    docs_included: set[int] = set()
 
     for score, doc, index, chunk in scored_chunks:
         if score <= 0 and docs_included and len(docs_included) >= len(docs):
             break
-        section = _format_doc_section(
-            doc,
-            chunk,
-            label=f"Relevant section {index + 1}",
-        )
+        section = _format_doc_section(doc, chunk, label=f"Relevant section {index + 1}")
         if used_chars + len(section) > budget:
             if not docs_included:
                 remaining = budget - used_chars
@@ -128,37 +118,21 @@ def _build_retrieved_context(
                     trimmed = chunk[: max(remaining - 200, 0)]
                     if trimmed:
                         selected.append(
-                            _format_doc_section(
-                                doc,
-                                trimmed + "…",
-                                label=f"Relevant section {index + 1} (truncated)",
-                            )
+                            _format_doc_section(doc, trimmed + "…", label=f"Relevant section {index + 1} (truncated)")
                         )
             continue
         selected.append(section)
         used_chars += len(section)
-        docs_included.add(doc.id or "")
+        docs_included.add(doc.id)
 
-    if not selected:
-        return "No document content available yet."
-
-    return "\n\n".join(selected)
+    return "\n\n".join(selected) if selected else "No document content available yet."
 
 
-def build_context(db: firestore.Client, message: str, history: list[dict]) -> str:
-    doc_ref = db.collection('site_config').document('1')
-    doc_snap = doc_ref.get()
-    if not doc_snap.exists:
-        config = SiteConfig(id="1")
-        doc_ref.set(config.model_dump(mode='json'))
-    else:
-        config = SiteConfig(**doc_snap.to_dict())
-
+def build_context(message: str, history: list[dict]) -> str:
+    config = load_config()
     profile = _build_profile_context(config)
 
-    docs_snap = db.collection('documents').get()
-    all_docs = [Document(**d.to_dict()) for d in docs_snap]
-    all_docs.sort(key=lambda d: d.upload_date, reverse=True)
+    all_docs = sorted(load_documents(), key=lambda d: d.upload_date, reverse=True)
 
     full_body, full_chars = _build_full_documents_context(all_docs)
 
@@ -185,11 +159,11 @@ def build_context(db: firestore.Client, message: str, history: list[dict]) -> st
     return f"{profile}\n{docs_header}{docs_context}"
 
 
-def generate_reply(db: firestore.Client, message: str, history: list[dict]) -> str:
+def generate_reply(message: str, history: list[dict]) -> str:
     if not GEMINI_API_KEY:
         return "AI chat is not configured. Please set the GEMINI_API_KEY environment variable."
 
-    context = build_context(db, message, history)
+    context = build_context(message, history)
 
     system_prompt = (
         "You are a helpful AI assistant for an Architecture Document Showcase portfolio website. "
@@ -206,7 +180,7 @@ def generate_reply(db: firestore.Client, message: str, history: list[dict]) -> s
         model = genai.GenerativeModel(GEMINI_MODEL)
 
         chat_history = []
-        trimmed = history[-MAX_HISTORY_TURNS * 2 :]
+        trimmed = history[-MAX_HISTORY_TURNS * 2:]
         for turn in trimmed:
             role = turn.get("role", "user")
             content = turn.get("content", "")
