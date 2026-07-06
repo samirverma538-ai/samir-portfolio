@@ -6,15 +6,30 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 from dotenv import load_dotenv
 
 load_dotenv(BASE_DIR / ".env")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET", "documents")
+
 RENDER = os.getenv("RENDER", "false").lower() == "true"
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL:
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+else:
+    if RENDER:
+        PERSISTENT_DIR = Path("/var/data")
+        PERSISTENT_DIR.mkdir(parents=True, exist_ok=True)
+        DATABASE_URL = f"sqlite:///{PERSISTENT_DIR / 'app.db'}"
+    else:
+        DATABASE_URL = f"sqlite:///{BASE_DIR / 'app.db'}"
+
 if RENDER:
     PERSISTENT_DIR = Path("/var/data")
     PERSISTENT_DIR.mkdir(parents=True, exist_ok=True)
     UPLOAD_DIR = PERSISTENT_DIR / "uploads"
-    DATABASE_URL = f"sqlite:///{PERSISTENT_DIR / 'app.db'}"
 else:
     UPLOAD_DIR = BASE_DIR / "uploads"
-    DATABASE_URL = f"sqlite:///{BASE_DIR / 'app.db'}"
 
 PROFILE_DIR = BASE_DIR / "static" / "profile"
 

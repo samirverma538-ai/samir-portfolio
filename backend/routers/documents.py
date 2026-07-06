@@ -5,8 +5,18 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
+import requests
+import mimetypes
 from auth import verify_admin
-from config import ALLOWED_EXTENSIONS, MAX_UPLOAD_SIZE, UPLOAD_DIR
+from config import (
+    ALLOWED_EXTENSIONS,
+    MAX_UPLOAD_SIZE,
+    UPLOAD_DIR,
+    THUMBNAIL_DIR,
+    SUPABASE_URL,
+    SUPABASE_KEY,
+    SUPABASE_BUCKET,
+)
 from database import get_db
 from models import Document
 from schemas import DocumentDelete, DocumentGroupResponse, DocumentFileResponse, DocumentUpdate
@@ -60,6 +70,50 @@ def _group_documents(docs: list[Document]) -> list[DocumentGroupResponse]:
     return groups
 
 
+def _upload_to_supabase(local_file_path: Path, remote_filename: str) -> str:
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return f"/uploads/{remote_filename}"
+
+    mime_type, _ = mimetypes.guess_type(str(local_file_path))
+    if not mime_type:
+        mime_type = "application/octet-stream"
+
+    url = f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/{SUPABASE_BUCKET}/{remote_filename}"
+    headers = {
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": mime_type
+    }
+
+    with open(local_file_path, "rb") as f:
+        file_bytes = f.read()
+
+    response = requests.post(url, headers=headers, data=file_bytes)
+    if response.status_code != 200:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Supabase upload failed: {response.text}"
+        )
+
+    return f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/public/{SUPABASE_BUCKET}/{remote_filename}"
+
+
+def _delete_from_supabase(remote_filename: str):
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return
+
+    url = f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/{SUPABASE_BUCKET}"
+    headers = {
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json"
+    }
+    body = {"prefixes": [remote_filename]}
+
+    try:
+        requests.delete(url, headers=headers, json=body)
+    except Exception:
+        pass
+
+
 async def _save_upload(file: UploadFile, description: str, group_id: str, group_order: int, db: Session) -> Document:
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided")
@@ -82,8 +136,26 @@ async def _save_upload(file: UploadFile, description: str, group_id: str, group_
     extracted = extract_text(dest, ext)
     thumbnail_path = None
 
+    has_supabase = bool(SUPABASE_URL and SUPABASE_KEY)
+
     if group_order == 0:
-        thumbnail_path = create_thumbnail(dest, ext, extracted)
+        local_thumb_path = create_thumbnail(dest, ext, extracted)
+        if local_thumb_path:
+            if has_supabase:
+                local_file = THUMBNAIL_DIR / Path(local_thumb_path).name
+                if local_file.exists():
+                    thumbnail_path = _upload_to_supabase(local_file, Path(local_thumb_path).name)
+                    local_file.unlink(missing_ok=True)
+                else:
+                    thumbnail_path = local_thumb_path
+            else:
+                thumbnail_path = local_thumb_path
+        else:
+            thumbnail_path = None
+
+    if has_supabase:
+        _upload_to_supabase(dest, stored_name)
+        dest.unlink(missing_ok=True)
 
     doc = Document(
         filename=stored_name,
@@ -170,7 +242,15 @@ def delete_document(doc_id: int, body: DocumentDelete, db: Session = Depends(get
         file_path = UPLOAD_DIR / item.filename
         if file_path.exists():
             file_path.unlink()
-        remove_thumbnail(item.thumbnail_path)
+        _delete_from_supabase(item.filename)
+
+        if item.thumbnail_path:
+            if item.thumbnail_path.startswith("http"):
+                thumb_filename = Path(item.thumbnail_path).name
+                _delete_from_supabase(thumb_filename)
+            else:
+                remove_thumbnail(item.thumbnail_path)
+
         db.delete(item)
     db.commit()
     return {"message": "Document group deleted"}

@@ -13,7 +13,11 @@ services:
         sync: false
       - key: GEMINI_MODEL
         value: gemini-2.5-flash
-    disk:
-      name: data
-      mountPath: /var/data
-      sizeGB: 1
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_BUCKET
+        value: documents
