@@ -26,14 +26,8 @@ MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50 MB
 
 # Data persistence folders
 RENDER = os.getenv("RENDER", "false").lower() == "true"
-if RENDER:
-    PERSISTENT_DIR = Path("/var/data")
-    PERSISTENT_DIR.mkdir(parents=True, exist_ok=True)
-    UPLOAD_DIR = PERSISTENT_DIR / "uploads"
-    DATA_DIR = PERSISTENT_DIR / "data"
-else:
-    UPLOAD_DIR = BASE_DIR / "uploads"
-    DATA_DIR = BASE_DIR / "data"
+UPLOAD_DIR = BASE_DIR / "uploads"
+DATA_DIR = BASE_DIR / "data"
 
 PROFILE_DIR = BASE_DIR / "static" / "profile"
 THUMBNAIL_DIR = BASE_DIR / "static" / "thumbnails"
