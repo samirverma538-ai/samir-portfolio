@@ -43,7 +43,11 @@ def _migrate_documents():
     columns = {col["name"] for col in inspector.get_columns("documents")}
     with engine.begin() as conn:
         if "group_id" not in columns:
-            conn.execute(text("ALTER TABLE
+            conn.execute(text("ALTER TABLE documents ADD COLUMN group_id VARCHAR(36)"))
+        if "group_order" not in columns:
+            conn.execute(text("ALTER TABLE documents ADD COLUMN group_order INTEGER DEFAULT 0"))
+        if "thumbnail_path" not in columns:
+            conn.execute(text("ALTER TABLE documents ADD COLUMN thumbnail_path VARCHAR(500)"))
 
     db = SessionLocal()
     try:

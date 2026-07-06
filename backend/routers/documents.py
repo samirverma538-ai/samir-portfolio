@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -45,6 +46,84 @@ def _to_group_response(primary: Document, files: list[Document]) -> DocumentGrou
 
 
 
+def _group_documents(docs: list[Document]) -> list[DocumentGroupResponse]:
+    grouped: dict[str, list[Document]] = {}
+    for doc in docs:
+        grouped.setdefault(_group_key(doc), []).append(doc)
+
+    groups: list[DocumentGroupResponse] = []
+    for files in grouped.values():
+        files.sort(key=lambda d: (d.group_order, d.id or 0))
+        groups.append(_to_group_response(files[0], files))
+
+    groups.sort(key=lambda g: g.upload_date, reverse=True)
+    return groups
+
+
+async def _save_upload(file: UploadFile, description: str, group_id: str, group_order: int, db: Session) -> Document:
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename provided")
+
+    ext = _get_extension(file.filename)
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File type not allowed for '{file.filename}'. Accepted: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+        )
+
+    content = await file.read()
+    if len(content) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=400, detail=f"File '{file.filename}' exceeds 50 MB limit")
+
+    stored_name = f"{uuid.uuid4().hex}{ext}"
+    dest = UPLOAD_DIR / stored_name
+    dest.write_bytes(content)
+
+    extracted = extract_text(dest, ext)
+    thumbnail_path = None
+
+    if group_order == 0:
+        thumbnail_path = create_thumbnail(dest, ext, extracted)
+
+    doc = Document(
+        filename=stored_name,
+        original_filename=file.filename,
+        file_type=ext,
+        description=description,
+        extracted_text=extracted,
+        group_id=group_id,
+        group_order=group_order,
+        thumbnail_path=thumbnail_path,
+        upload_date=datetime.now(timezone.utc)
+    )
+    db.add(doc)
+    return doc
+
+
+@router.get("", response_model=list[DocumentGroupResponse])
+def list_documents(db: Session = Depends(get_db)):
+    docs = db.query(Document).all()
+    return _group_documents(docs)
+
+
+@router.post("", response_model=DocumentGroupResponse)
+async def upload_documents(
+    files: list[UploadFile] = File(...),
+    description: str = Form(""),
+    admin_password: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    verify_admin(admin_password)
+
+    if not files:
+        raise HTTPException(status_code=400, detail="At least one file is required")
+
+    group_id = uuid.uuid4().hex
+    saved: list[Document] = []
+
+    try:
+        for order, file in enumerate(files):
+            saved.append(await _save_upload(file, description, group_id, order, db))
         db.commit()
         for doc in saved:
             db.refresh(doc)
