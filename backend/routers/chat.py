@@ -13,3 +13,4 @@ def chat(body: ChatRequest, db: Session = Depends(get_db)):
     history = [{"role": m.role, "content": m.content} for m in body.history]
     reply = generate_reply(db, body.message, history)
     return ChatResponse(reply=reply)
+

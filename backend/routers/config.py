@@ -1,36 +1,36 @@
+import shutil
 import uuid
 from pathlib import Path
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from google.cloud import firestore
+from sqlalchemy.orm import Session
 
 from auth import verify_admin
 from config import PROFILE_DIR
-from database import get_db, bucket
+from database import get_db
 from models import SiteConfig
 from schemas import SiteConfigResponse, SiteConfigUpdate
 
 router = APIRouter(prefix="/api/config", tags=["config"])
 
 
-def _get_or_create_config(db: firestore.Client) -> SiteConfig:
-    doc_ref = db.collection('site_config').document('1')
-    doc = doc_ref.get()
-    if not doc.exists:
-        config = SiteConfig(id="1")
-        doc_ref.set(config.model_dump(mode='json'))
-        return config
-    return SiteConfig(**doc.to_dict())
+def _get_or_create_config(db: Session) -> SiteConfig:
+    config = db.query(SiteConfig).first()
+    if not config:
+        config = SiteConfig(id=1)
+        db.add(config)
+        db.commit()
+        db.refresh(config)
+    return config
 
 
 @router.get("", response_model=SiteConfigResponse)
-def get_config(db = Depends(get_db)):
+def get_config(db: Session = Depends(get_db)):
     return _get_or_create_config(db)
 
 
 @router.put("", response_model=SiteConfigResponse)
-def update_config(body: SiteConfigUpdate, db = Depends(get_db)):
+def update_config(body: SiteConfigUpdate, db: Session = Depends(get_db)):
     verify_admin(body.admin_password)
     config = _get_or_create_config(db)
 
@@ -48,7 +48,8 @@ def update_config(body: SiteConfigUpdate, db = Depends(get_db)):
         if value is not None:
             setattr(config, field, value)
 
-    db.collection('site_config').document('1').set(config.model_dump(mode='json'))
+    db.commit()
+    db.refresh(config)
     return config
 
 
@@ -56,7 +57,7 @@ def update_config(body: SiteConfigUpdate, db = Depends(get_db)):
 async def upload_profile_picture(
     file: UploadFile = File(...),
     admin_password: str = Form(...),
-    db = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     verify_admin(admin_password)
 
@@ -68,27 +69,20 @@ async def upload_profile_picture(
         raise HTTPException(status_code=400, detail="Only JPG and PNG images are allowed")
 
     stored_name = f"profile_{uuid.uuid4().hex}{ext}"
-    
-    # Upload to Firebase Storage
-    blob = bucket.blob(f"profile/{stored_name}")
+    dest = PROFILE_DIR / stored_name
     content = await file.read()
-    blob.upload_from_string(content, content_type=file.content_type)
-    # Make it publicly accessible
-    blob.make_public()
+    dest.write_bytes(content)
 
     config = _get_or_create_config(db)
-    
-    old = config.profile_picture
-    if old and old.startswith("http"):
-        try:
-            # Attempt to delete old picture if it was in the bucket
-            old_blob_name = old.split("?")[0].split("/")[-1]
-            old_blob = bucket.blob(f"profile/{old_blob_name}")
-            if old_blob.exists():
-                old_blob.delete()
-        except Exception:
-            pass
 
-    config.profile_picture = blob.public_url
-    db.collection('site_config').document('1').set(config.model_dump(mode='json'))
+    old = config.profile_picture
+    if old and old.startswith("/static/profile/"):
+        old_path = PROFILE_DIR / Path(old).name
+        if old_path.exists() and old_path.name != "default.jpg":
+            old_path.unlink(missing_ok=True)
+
+    config.profile_picture = f"/static/profile/{stored_name}"
+    db.commit()
+    db.refresh(config)
     return config
+

@@ -1,20 +1,20 @@
-import firebase_admin
-from firebase_admin import credentials
-from firebase_admin import firestore
-from firebase_admin import storage
+from sqlalchemy import create_engine
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-# Initialize Firebase Admin if not already initialized
-if not firebase_admin._apps:
-    # Use application default credentials (works on Cloud Run/Functions)
-    # Locally, set GOOGLE_APPLICATION_CREDENTIALS
-    cred = credentials.ApplicationDefault()
-    firebase_admin.initialize_app(cred, {
-        'projectId': 'samir-website-23733',
-        'storageBucket': 'samir-website-23733.firebasestorage.app'
-    })
+from config import DATABASE_URL
 
-db = firestore.client()
-bucket = storage.bucket()
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+class Base(DeclarativeBase):
+    pass
+
 
 def get_db():
-    return db
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+

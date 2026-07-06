@@ -91,3 +91,4 @@ class ChatResponse(BaseModel):
 
 class AdminAuth(BaseModel):
     admin_password: str
+

@@ -27,3 +27,4 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 PROFILE_DIR.mkdir(parents=True, exist_ok=True)
 THUMBNAIL_DIR = BASE_DIR / "static" / "thumbnails"
 THUMBNAIL_DIR.mkdir(parents=True, exist_ok=True)
+
