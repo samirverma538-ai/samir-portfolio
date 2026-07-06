@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard — Architecture Document Showcase</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body class="admin-body">
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="brand">
+        <h1>Admin Dashboard</h1>
+        <p class="subheader">Manage site configuration and documents</p>
+      </div>
+      <nav class="header-nav">
+        <a href="/" class="nav-link">← Back to Site</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container admin-main">
+    <section class="card admin-section">
+      <h2>Site Configuration</h2>
+      <form id="config-form" class="admin-form">
+        <div class="form-row">
+          <label for="header">Header</label>
+          <input type="text" id="header" name="header" required>
+        </div>
+        <div class="form-row">
+          <label for="subheader">Subheader</label>
+          <input type="text" id="subheader" name="subheader" required>
+        </div>
+        <div class="form-row">
+          <label for="owner_name">Owner Name</label>
+          <input type="text" id="owner_name" name="owner_name" required>
+        </div>
+        <div class="form-row">
+          <label for="role">Professional Role</label>
+          <input type="text" id="role" name="role" required>
+        </div>
+        <div class="form-row">
+          <label for="experience">Experience / Bio</label>
+          <textarea id="experience" name="experience" rows="4" required></textarea>
+        </div>
+        <div class="form-row">
+          <label for="contact_email">Contact Email</label>
+          <input type="email" id="contact_email" name="contact_email">
+        </div>
+        <div class="form-row">
+          <label for="contact_phone">Contact Phone</label>
+          <input type="text" id="contact_phone" name="contact_phone">
+        </div>
+        <div class="form-row">
+          <label for="contact_linkedin">LinkedIn URL</label>
+          <input type="url" id="contact_linkedin" name="contact_linkedin">
+        </div>
+        <div class="form-row">
+          <label for="admin_password_config">Admin Password</label>
+          <input type="password" id="admin_password_config" name="admin_password" required placeholder="Required to save">
+        </div>
+        <button type="submit" class="btn btn-primary">Save Configuration</button>
+        <p id="config-status" class="form-status"></p>
+      </form>
+    </section>
+
+    <section class="card admin-section">
+      <h2>Profile Picture</h2>
+      <div class="profile-upload">
+        <img id="admin-profile-preview" class="profile-pic large" src="/static/profile/default.jpg" alt="Profile preview">
+        <form id="profile-form" class="admin-form">
+          <div class="form-row">
+            <label for="profile_file">Upload Image (JPG/PNG)</label>
+            <input type="file" id="profile_file" name="file" accept=".jpg,.jpeg,.png" required>
+          </div>
+          <div class="form-row">
+            <label for="admin_password_profile">Admin Password</label>
+            <input type="password" id="admin_password_profile" name="admin_password" required>
+          </div>
+          <button type="submit" class="btn btn-primary">Upload Picture</button>
+          <p id="profile-status" class="form-status"></p>
+        </form>
+      </div>
+    </section>
+
+    <section class="card admin-section">
+      <h2>Upload Documents</h2>
+      <form id="upload-form" class="admin-form">
+        <div class="form-row">
+          <label>Files (up to 4)</label>
+          <div id="file-upload-slots" class="file-upload-slots"></div>
+          <p class="upload-hint">After selecting a file, a new browse option will appear until you reach 4 files.</p>
+        </div>
+        <div class="form-row">
+          <label for="doc_description">Description</label>
+          <textarea id="doc_description" name="description" rows="2" placeholder="Brief description for this upload"></textarea>
+        </div>
+        <div class="form-row">
+          <label for="admin_password_upload">Admin Password</label>
+          <input type="password" id="admin_password_upload" name="admin_password" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Upload Documents</button>
+        <p id="upload-status" class="form-status"></p>
+      </form>
+    </section>
+
+    <section class="card admin-section">
+      <h2>Manage Documents</h2>
+      <div id="admin-documents-list" class="admin-doc-list">
+        <p class="empty-state">Loading documents…</p>
+      </div>
+    </section>
+  </main>
+
+  <script src="/js/admin.js" type="module"></script>
+</body>
+</html>

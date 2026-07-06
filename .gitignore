@@ -1,0 +1,11 @@
+.env
+*.db
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+uploads/*
+!uploads/.gitkeep
+static/profile/*
+!static/profile/.gitkeep
+.DS_Store

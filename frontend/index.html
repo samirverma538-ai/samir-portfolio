@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Architecture Document Showcase</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="brand">
+        <img id="profile-picture" class="profile-pic" src="/static/profile/default.jpg" alt="Profile">
+        <div>
+          <h1 id="site-header">Architecture Document Showcase</h1>
+          <p id="site-subheader" class="subheader">Professional portfolio &amp; interactive document repository</p>
+        </div>
+      </div>
+      <nav class="header-nav">
+        <a href="#documents" class="nav-link">Documents</a>
+        <a href="#" id="chat-nav-link" class="nav-link">AI Chat</a>
+        <a href="/admin" class="nav-link nav-admin">Admin</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero card" id="about">
+      <div class="hero-grid">
+        <div>
+          <span class="badge" id="owner-role">Solutions Architect</span>
+          <h2 id="owner-name">Samir Kumar Verma</h2>
+          <p id="owner-experience" class="experience-text"></p>
+        </div>
+        <div class="contact-card">
+          <h3>Contact</h3>
+          <ul class="contact-list">
+            <li id="contact-email-row" class="hidden"><span>Email</span> <a id="contact-email" href="#"></a></li>
+            <li id="contact-phone-row" class="hidden"><span>Phone</span> <span id="contact-phone"></span></li>
+            <li id="contact-linkedin-row" class="hidden"><span>LinkedIn</span> <a id="contact-linkedin" href="#" target="_blank" rel="noopener">Profile</a></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="documents" class="section">
+      <div class="section-header">
+        <h2>Document Repository</h2>
+        <p>Browse architecture documents, diagrams, and presentations.</p>
+      </div>
+      <div id="documents-grid" class="documents-grid">
+        <p class="empty-state">Loading documents…</p>
+      </div>
+    </section>
+  </main>
+
+  <div id="chat-widget" class="chat-widget">
+    <div id="chat-panel" class="chat-panel-floating hidden">
+      <div class="chat-panel-header">
+        <h3>AI Assistant</h3>
+        <button id="chat-close" class="btn-icon" aria-label="Close chat">&times;</button>
+      </div>
+      <div id="chat-messages" class="chat-messages">
+        <div class="chat-bubble assistant">
+          Hello! I can help you explore the architecture documents and learn about the site owner's experience. What would you like to know?
+        </div>
+      </div>
+      <form id="chat-form" class="chat-form">
+        <input type="text" id="chat-input" placeholder="Ask a question…" autocomplete="off" required>
+        <button type="submit" class="btn btn-primary">Send</button>
+      </form>
+    </div>
+    <button id="chat-toggle" class="chat-toggle" aria-label="Open AI chat" aria-expanded="false">💬</button>
+  </div>
+
+  <div id="viewer-modal" class="modal viewer-modal hidden">
+    <div class="modal-content viewer-fullscreen card">
+      <div class="modal-header viewer-header">
+        <h3 id="viewer-title">Document Preview</h3>
+        <div class="viewer-zoom-controls">
+          <button id="viewer-zoom-out" type="button" class="btn btn-secondary btn-xs" aria-label="Zoom out">−</button>
+          <button id="viewer-zoom-fit" type="button" class="btn btn-secondary btn-xs">Fit</button>
+          <span id="viewer-zoom-label" class="viewer-zoom-label">70%</span>
+          <button id="viewer-zoom-in" type="button" class="btn btn-secondary btn-xs" aria-label="Zoom in">+</button>
+        </div>
+        <button class="btn-icon" data-close-modal aria-label="Close">&times;</button>
+      </div>
+      <div id="viewer-scroll" class="viewer-scroll">
+        <div id="viewer-stage" class="viewer-stage">
+          <div id="viewer-zoom-shell" class="viewer-zoom-shell">
+            <div id="viewer-canvas" class="viewer-canvas"></div>
+          </div>
+        </div>
+        <div id="viewer-description" class="viewer-description"></div>
+        <div class="viewer-footer">
+          <div id="viewer-downloads" class="viewer-downloads"></div>
+          <div class="viewer-footer-actions">
+            <button id="viewer-download-all" class="btn btn-secondary btn-xs hidden" type="button">Download all</button>
+            <button id="viewer-delete" class="btn btn-danger btn-xs" type="button">Delete</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>&copy; <span id="footer-year"></span> <span id="footer-name">Architecture Document Showcase</span></p>
+    </div>
+  </footer>
+
+  <script src="/js/main.js" type="module"></script>
+</body>
+</html>
