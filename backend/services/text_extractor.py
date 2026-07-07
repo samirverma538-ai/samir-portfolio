@@ -13,7 +13,7 @@ def extract_text(file_path: Path, file_type: str) -> str:
         if ext in (".jpg", ".jpeg", ".png"):
             return f"[Image file: {file_path.name}]"
         if ext == ".txt":
-            return path.read_text(encoding="utf-8", errors="replace")
+            return file_path.read_text(encoding="utf-8", errors="replace")
     except Exception as exc:
         return f"[Text extraction failed: {exc}]"
     return ""

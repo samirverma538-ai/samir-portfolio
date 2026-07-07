@@ -3,6 +3,7 @@ import mimetypes
 import requests
 from datetime import datetime, timezone
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
@@ -22,7 +23,7 @@ from services.text_extractor import extract_text
 from services.thumbnail_generator import create_thumbnail, remove_thumbnail
 from store import (
     load_documents,
-    add_document,
+    add_documents,
     get_document_by_id,
     get_documents_by_group,
     update_documents,
@@ -128,7 +129,10 @@ async def upload_documents(
 
     group_id = uuid.uuid4().hex
     has_supabase = bool(SUPABASE_URL and SUPABASE_KEY)
-    saved: list[DocumentRecord] = []
+    
+    upload_tasks = []
+    local_files_to_cleanup = []
+    docs_to_create = []
 
     try:
         for order, file in enumerate(files):
@@ -149,6 +153,7 @@ async def upload_documents(
             stored_name = f"{uuid.uuid4().hex}{ext}"
             dest = UPLOAD_DIR / stored_name
             dest.write_bytes(content)
+            local_files_to_cleanup.append(dest)
 
             extracted = extract_text(dest, ext)
             thumbnail_path = None
@@ -157,18 +162,19 @@ async def upload_documents(
                 local_thumb = create_thumbnail(dest, ext, extracted)
                 if local_thumb:
                     if has_supabase:
-                        local_file = THUMBNAIL_DIR / Path(local_thumb).name
-                        if local_file.exists():
-                            thumbnail_path = _upload_to_supabase(local_file, Path(local_thumb).name)
-                            local_file.unlink(missing_ok=True)
+                        thumb_name = Path(local_thumb).name
+                        local_thumb_file = THUMBNAIL_DIR / thumb_name
+                        if local_thumb_file.exists():
+                            thumbnail_path = f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/public/{SUPABASE_BUCKET}/{thumb_name}"
+                            upload_tasks.append((local_thumb_file, thumb_name))
+                            local_files_to_cleanup.append(local_thumb_file)
                         else:
                             thumbnail_path = local_thumb
                     else:
                         thumbnail_path = local_thumb
 
             if has_supabase:
-                _upload_to_supabase(dest, stored_name)
-                dest.unlink(missing_ok=True)
+                upload_tasks.append((dest, stored_name))
 
             doc = DocumentRecord(
                 filename=stored_name,
@@ -181,15 +187,30 @@ async def upload_documents(
                 thumbnail_path=thumbnail_path,
                 upload_date=datetime.now(timezone.utc),
             )
-            saved.append(add_document(doc))
+            docs_to_create.append(doc)
 
-    except HTTPException:
-        for doc in saved:
-            (UPLOAD_DIR / doc.filename).unlink(missing_ok=True)
-        raise
+        # Upload files concurrently to Supabase Storage
+        if has_supabase and upload_tasks:
+            def upload_worker(task):
+                local_path, remote_name = task
+                _upload_to_supabase(local_path, remote_name)
+
+            with ThreadPoolExecutor(max_workers=min(len(upload_tasks), 10)) as executor:
+                list(executor.map(upload_worker, upload_tasks))
+
+        # Save all records in one batch write
+        saved = add_documents(docs_to_create)
+
+        # Clean up local files if they were successfully uploaded
+        if has_supabase:
+            for local_path in local_files_to_cleanup:
+                local_path.unlink(missing_ok=True)
+
     except Exception as exc:
-        for doc in saved:
-            (UPLOAD_DIR / doc.filename).unlink(missing_ok=True)
+        for local_path in local_files_to_cleanup:
+            local_path.unlink(missing_ok=True)
+        if isinstance(exc, HTTPException):
+            raise
         raise HTTPException(status_code=500, detail=f"Failed to upload documents: {exc}")
 
     return _to_group_response(saved[0], saved)

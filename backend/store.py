@@ -155,6 +155,18 @@ def add_document(doc: DocumentRecord) -> DocumentRecord:
     return doc
 
 
+def add_documents(docs: list[DocumentRecord]) -> list[DocumentRecord]:
+    with _lock:
+        raw = _read_with_cloud_fallback(DOCUMENTS_FILE, _REMOTE_DOCS_KEY, [])
+        existing_ids = [d.get("id", 0) for d in raw]
+        current_max = max(existing_ids, default=0)
+        for idx, doc in enumerate(docs):
+            doc.id = current_max + 1 + idx
+            raw.append(doc.model_dump(mode="json"))
+        _write_with_cloud_sync(DOCUMENTS_FILE, _REMOTE_DOCS_KEY, raw)
+    return docs
+
+
 def update_documents(docs: list[DocumentRecord]) -> None:
     """Upsert/replace a list of documents by id."""
     all_docs = load_documents()
