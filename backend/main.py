@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 from config import BASE_DIR, PROFILE_DIR, UPLOAD_DIR, SUPABASE_URL, SUPABASE_KEY, SUPABASE_BUCKET
 from routers import chat, config, documents
-from store import load_config, save_config
+from store import load_config, load_documents
 
 app = FastAPI(title="Architecture Document Showcase", version="1.0.0")
 
@@ -50,8 +50,9 @@ def startup():
     if not default_profile.exists() and beach.exists():
         shutil.copy(beach, default_profile)
 
-    # Ensure config.json exists with defaults
+    # Restore data from Supabase cloud backup (if local files were wiped)
     load_config()
+    load_documents()
 
 
 @app.get("/", response_class=HTMLResponse)
