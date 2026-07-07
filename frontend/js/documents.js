@@ -34,6 +34,7 @@ function getPrimaryFile(group) {
 }
 
 function getGroupTitle(group) {
+  if (group.title) return group.title;
   if (group.description) return group.description;
   return group.files.length > 1 ? `Document set (${group.files.length} files)` : "Document";
 }
@@ -186,6 +187,7 @@ export async function loadDocumentsGrid(gridEl) {
     gridEl.innerHTML = groups
       .map((group) => {
         const primary = getPrimaryFile(group);
+        const title = group.title || getGroupTitle(group);
         const description = group.description || "No description provided.";
         const fileCountLabel = group.files.length > 1 ? ` · ${group.files.length} files` : "";
         const thumb = primary.thumbnail_path
@@ -196,6 +198,7 @@ export async function loadDocumentsGrid(gridEl) {
       <article class="doc-card" data-group-id="${group.id}">
         <div class="doc-card-body">
           <div class="doc-thumb">${thumb}</div>
+          <h3>${escapeHtml(title)}</h3>
           <div class="doc-desc-scroll">${escapeHtml(description)}</div>
           <p class="doc-meta">${formatDate(group.upload_date)}${fileCountLabel}</p>
         </div>
@@ -279,6 +282,7 @@ function closeViewer() {
 async function openViewer(group) {
   const modal = document.getElementById("viewer-modal");
   const canvas = getViewerCanvas();
+  const titleEl = document.getElementById("viewer-title");
   const description = document.getElementById("viewer-description");
   const downloads = document.getElementById("viewer-downloads");
   const downloadAllBtn = document.getElementById("viewer-download-all");
@@ -289,6 +293,9 @@ async function openViewer(group) {
   currentViewerGroup = group;
   resetViewerZoom();
   canvas.innerHTML = '<p class="viewer-loading">Loading preview…</p>';
+  if (titleEl) {
+    titleEl.textContent = group.title || getGroupTitle(group);
+  }
   if (description) {
     description.textContent = group.description || "No description provided.";
   }

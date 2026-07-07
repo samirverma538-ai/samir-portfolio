@@ -64,11 +64,12 @@ export async function fetchDocuments() {
   return normalizeDocumentGroups(data);
 }
 
-export async function uploadDocuments(files, description, adminPassword) {
+export async function uploadDocuments(files, title, description, adminPassword) {
   const form = new FormData();
   for (const file of files) {
     form.append("files", file);
   }
+  form.append("title", title);
   form.append("description", description);
   form.append("admin_password", adminPassword);
   const res = await fetch(`${API_BASE}/api/documents`, {
@@ -82,11 +83,11 @@ export async function uploadDocuments(files, description, adminPassword) {
   return res.json();
 }
 
-export async function updateDocument(id, description, adminPassword) {
+export async function updateDocument(id, title, description, adminPassword) {
   const res = await fetch(`${API_BASE}/api/documents/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ description, admin_password: adminPassword }),
+    body: JSON.stringify({ title, description, admin_password: adminPassword }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

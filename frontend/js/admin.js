@@ -77,6 +77,7 @@ function escapeHtml(text) {
 }
 
 function getGroupLabel(group) {
+  if (group.title) return group.title;
   const primary = group.files[0];
   if (group.description) return group.description;
   if (group.files.length === 1) return primary.original_filename;
@@ -132,6 +133,7 @@ async function loadAdminDocuments() {
           </ul>
         </div>
         <div class="admin-doc-actions">
+          <input type="text" class="title-input" value="${escapeHtml(group.title || "")}" placeholder="Title / Header">
           <input type="text" class="desc-input" value="${escapeHtml(group.description || "")}" placeholder="Description">
           <input type="password" class="pw-input" placeholder="Admin password">
           <button class="btn btn-secondary save-desc-btn">Save</button>
@@ -146,11 +148,12 @@ async function loadAdminDocuments() {
       const id = Number(item.dataset.id);
 
       item.querySelector(".save-desc-btn")?.addEventListener("click", async () => {
+        const title = item.querySelector(".title-input")?.value ?? "";
         const desc = item.querySelector(".desc-input")?.value ?? "";
         const pw = item.querySelector(".pw-input")?.value ?? "";
         try {
-          await updateDocument(id, desc, pw);
-          alert("Description updated.");
+          await updateDocument(id, title, desc, pw);
+          alert("Document details updated.");
           await loadAdminDocuments();
         } catch (err) {
           alert(err.message);
@@ -230,12 +233,13 @@ document.getElementById("upload-form")?.addEventListener("submit", async (e) => 
   }
 
   try {
-    const result = await uploadDocuments(files, form.description.value, form.admin_password.value);
+    const result = await uploadDocuments(files, form.title.value, form.description.value, form.admin_password.value);
     setStatus(
       status,
       `${result.files.length} document(s) uploaded successfully.`,
       "success"
     );
+    form.title.value = "";
     form.description.value = "";
     form.admin_password.value = "";
     resetUploadSlots();

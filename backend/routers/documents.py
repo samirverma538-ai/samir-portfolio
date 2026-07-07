@@ -47,6 +47,7 @@ def _to_group_response(primary: DocumentRecord, files: list[DocumentRecord]) -> 
     return DocumentGroupResponse(
         id=primary.id,
         group_id=_group_key(primary),
+        title=primary.title or "",
         description=primary.description or "",
         upload_date=primary.upload_date,
         files=[
@@ -119,6 +120,7 @@ def list_documents():
 @router.post("", response_model=DocumentGroupResponse)
 async def upload_documents(
     files: list[UploadFile] = File(...),
+    title: str = Form(""),
     description: str = Form(""),
     admin_password: str = Form(...),
 ):
@@ -180,6 +182,7 @@ async def upload_documents(
                 filename=stored_name,
                 original_filename=file.filename,
                 file_type=ext,
+                title=title,
                 description=description,
                 extracted_text=extracted,
                 group_id=group_id,
@@ -225,6 +228,8 @@ def update_document(doc_id: int, body: DocumentUpdate):
 
     group_docs = get_documents_by_group(doc.group_id) if doc.group_id else [doc]
     for item in group_docs:
+        if body.title is not None:
+            item.title = body.title
         item.description = body.description
     update_documents(group_docs)
 

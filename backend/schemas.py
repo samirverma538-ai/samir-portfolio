@@ -19,6 +19,7 @@ class DocumentFileResponse(BaseModel):
 class DocumentGroupResponse(BaseModel):
     id: int
     group_id: str
+    title: str = ""
     description: str
     upload_date: datetime
     files: list[DocumentFileResponse]
@@ -32,6 +33,7 @@ class DocumentResponse(BaseModel):
     filename: str
     original_filename: str
     file_type: str
+    title: str = ""
     description: str
     upload_date: datetime
 
@@ -40,6 +42,7 @@ class DocumentResponse(BaseModel):
 
 
 class DocumentUpdate(BaseModel):
+    title: Optional[str] = ""
     description: str
     admin_password: str
 

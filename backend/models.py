@@ -9,6 +9,7 @@ class DocumentRecord(BaseModel):
     filename: str
     original_filename: str
     file_type: str
+    title: str = ""
     description: str = ""
     extracted_text: str = ""
     group_id: Optional[str] = None
